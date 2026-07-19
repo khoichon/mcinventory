@@ -20,6 +20,7 @@
     --accent:#5cc55c;
     --accent-2:#3a8bd4;
     --enchant:#a05cff;
+    --potion:#3ad6c9;
     --danger:#c94b4b;
     --text-dark:#2b2b2b;
     --text-mid:#4a4a4a;
@@ -134,6 +135,29 @@
       inset 2px 2px 0 #ffffff88,
       inset -2px -2px 0 #00000066,
       0 0 0 2px var(--accent-2), 0 0 10px var(--enchant);
+  }
+  .slot.potioned{
+    box-shadow:
+      inset 2px 2px 0 #ffffff55,
+      inset -2px -2px 0 #00000055,
+      0 0 8px 2px var(--potion);
+  }
+  .slot.selected.potioned{
+    box-shadow:
+      inset 2px 2px 0 #ffffff88,
+      inset -2px -2px 0 #00000066,
+      0 0 0 2px var(--accent-2), 0 0 10px var(--potion);
+  }
+  .slot-potion-badge{
+    position:absolute;
+    top:-3px;
+    right:-3px;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:var(--potion);
+    box-shadow:0 0 0 2px #2b2b2b;
+    font-size:8px;
   }
   .slot-icon{
     width:74%;
@@ -280,10 +304,26 @@
   .enchant-chip button{
     background:none; border:none; color:#c78bff; cursor:pointer; font-size:14px; line-height:1;
   }
-  .enchant-add-row{ display:flex; gap:6px; margin-top:8px; }
+  .enchant-add-row{ display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
   .enchant-add-row select, .enchant-add-row select + select{
     flex:1; padding:7px; border-radius:4px; background:#161821; color:#fff; border:1px solid #444a5a; font-size:12.5px;
   }
+  .potion-list{ display:flex; flex-direction:column; gap:6px; }
+  .potion-chip{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#123634; border:1px solid #2f8a7f; border-radius:5px;
+    padding:6px 10px; font-size:12.5px; color:#bdf5ee;
+  }
+  .potion-chip button{
+    background:none; border:none; color:#7fe0d4; cursor:pointer; font-size:14px; line-height:1;
+  }
+  .potion-add-row{ display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .potion-add-row select, .potion-add-row input{
+    padding:7px; border-radius:4px; background:#161821; color:#fff; border:1px solid #444a5a; font-size:12.5px;
+  }
+  .potion-add-row select{ flex:2; min-width:120px; }
+  .potion-add-row input[type=number]{ width:64px; flex:0 0 auto; }
+  .potion-add-row input[type=text]{ flex:1; min-width:80px; }
   .action-row{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
   .container-info{
     background:#161821; border-radius:5px; padding:10px 12px; font-size:12.5px; color:#aab0c0; margin-top:10px;
@@ -483,6 +523,36 @@
   ];
   const ROMAN = ['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
 
+  const POTION_EFFECTS = [
+    {id:'speed', name:'Speed'}, {id:'slowness', name:'Slowness'},
+    {id:'haste', name:'Haste'}, {id:'mining_fatigue', name:'Mining Fatigue'},
+    {id:'strength', name:'Strength'}, {id:'instant_health', name:'Instant Health'},
+    {id:'instant_damage', name:'Instant Damage'}, {id:'jump_boost', name:'Jump Boost'},
+    {id:'nausea', name:'Nausea'}, {id:'regeneration', name:'Regeneration'},
+    {id:'resistance', name:'Resistance'}, {id:'fire_resistance', name:'Fire Resistance'},
+    {id:'water_breathing', name:'Water Breathing'}, {id:'invisibility', name:'Invisibility'},
+    {id:'blindness', name:'Blindness'}, {id:'night_vision', name:'Night Vision'},
+    {id:'hunger', name:'Hunger'}, {id:'weakness', name:'Weakness'},
+    {id:'poison', name:'Poison'}, {id:'wither', name:'Wither'},
+    {id:'health_boost', name:'Health Boost'}, {id:'absorption', name:'Absorption'},
+    {id:'saturation', name:'Saturation'}, {id:'glowing', name:'Glowing'},
+    {id:'levitation', name:'Levitation'}, {id:'luck', name:'Luck'},
+    {id:'unluck', name:'Bad Luck'}, {id:'slow_falling', name:'Slow Falling'},
+    {id:'conduit_power', name:'Conduit Power'}, {id:'dolphins_grace', name:'Dolphin\u2019s Grace'},
+    {id:'bad_omen', name:'Bad Omen'}, {id:'hero_of_the_village', name:'Hero of the Village'},
+    {id:'darkness', name:'Darkness'}
+  ];
+  // Items that can carry brewed potion effects: potions, tipped arrows, and lingering-cloud sources.
+  function isPotionItem(name){
+    if(!name) return false;
+    return /(^|_)potion$/.test(name) || name === 'tipped_arrow' || name === 'lingering_potion' || name === 'splash_potion';
+  }
+  function formatDuration(sec){
+    if(sec >= 1000000) return 'Infinite';
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return `${m}:${String(s).padStart(2,'0')}`;
+  }
+
   // Offline fallback item list, used only if both CDN sources fail.
   const FALLBACK_ITEMS = [
     ['diamond_sword','Diamond Sword',1],['netherite_sword','Netherite Sword',1],
@@ -512,6 +582,8 @@
     ['crafting_table','Crafting Table',64],['furnace','Furnace',64],['anvil','Anvil',64],
     ['name_tag','Name Tag',64],['saddle','Saddle',1],['compass','Compass',64],
     ['clock','Clock',64],['fishing_rod','Fishing Rod',1],['flint_and_steel','Flint and Steel',1],
+    ['potion','Potion',1],['splash_potion','Splash Potion',1],['lingering_potion','Lingering Potion',1],
+    ['tipped_arrow','Tipped Arrow',64],['glass_bottle','Glass Bottle',64],
   ];
 
   const CONTAINER_LABELS = {
@@ -598,6 +670,7 @@
       count: 1,
       maxStack: dbItem.stackSize || 64,
       enchantments: [],
+      potionEffects: isPotionItem(dbItem.name) ? [] : null,
       contents: capacity > 0 ? Array(capacity).fill(null) : null
     };
   }
@@ -647,8 +720,8 @@
 
   function renderSlotContent(el, accessor){
     // clear icon/count/badge but keep label if present
-    Array.from(el.querySelectorAll('.slot-icon,.slot-count,.slot-badge')).forEach(n => n.remove());
-    el.classList.remove('enchanted','selected');
+    Array.from(el.querySelectorAll('.slot-icon,.slot-count,.slot-badge,.slot-potion-badge')).forEach(n => n.remove());
+    el.classList.remove('enchanted','selected','potioned');
     const item = accessor.get();
 
     if(selectedAccessor && selectedAccessor.container === accessor.container && selectedAccessor.key === accessor.key){
@@ -672,6 +745,14 @@
 
     if(item.enchantments && item.enchantments.length > 0){
       el.classList.add('enchanted');
+    } else if(item.potionEffects && item.potionEffects.length > 0){
+      el.classList.add('potioned');
+    }
+
+    if(item.potionEffects && item.potionEffects.length > 0){
+      const pbadge = document.createElement('div');
+      pbadge.className = 'slot-potion-badge';
+      el.appendChild(pbadge);
     }
 
     if(item.contents && item.contents.some(Boolean)){
@@ -841,6 +922,75 @@
     addRow.appendChild(lvlSelect);
     addRow.appendChild(addBtn);
     detailsPanel.appendChild(addRow);
+
+    // Potion Effects (potions, splash/lingering potions, tipped arrows)
+    if(item.potionEffects){
+      const potLabel = document.createElement('div');
+      potLabel.className = 'field-label';
+      potLabel.textContent = 'Potion Effects';
+      detailsPanel.appendChild(potLabel);
+
+      const potList = document.createElement('div');
+      potList.className = 'potion-list';
+      if(item.potionEffects.length === 0){
+        const none = document.createElement('div');
+        none.style.cssText = 'font-size:12px;color:#666e80;';
+        none.textContent = 'No effects applied. This will pour/shoot as a plain water bottle.';
+        potList.appendChild(none);
+      } else {
+        item.potionEffects.forEach((eff, idx) => {
+          const chip = document.createElement('div');
+          chip.className = 'potion-chip';
+          const label = `${eff.name} ${ROMAN[eff.amplifier + 1] || (eff.amplifier + 1)} — ${formatDuration(eff.duration)}`;
+          chip.innerHTML = `<span>${escapeHtml(label)}</span>`;
+          const rm = document.createElement('button');
+          rm.textContent = '✕';
+          rm.addEventListener('click', () => {
+            item.potionEffects.splice(idx,1);
+            renderAll();
+          });
+          chip.appendChild(rm);
+          potList.appendChild(chip);
+        });
+      }
+      detailsPanel.appendChild(potList);
+
+      const potAddRow = document.createElement('div');
+      potAddRow.className = 'potion-add-row';
+      const effSelect = document.createElement('select');
+      POTION_EFFECTS.forEach(e => {
+        const opt = document.createElement('option');
+        opt.value = e.id; opt.textContent = e.name;
+        effSelect.appendChild(opt);
+      });
+      const ampInput = document.createElement('input');
+      ampInput.type = 'number'; ampInput.min = 1; ampInput.max = 10; ampInput.value = 1;
+      ampInput.title = 'Amplifier level (I, II, III…)';
+      const durInput = document.createElement('input');
+      durInput.type = 'text'; durInput.value = '0:45';
+      durInput.title = 'Duration as m:ss (e.g. 3:00)';
+      const potAddBtn = document.createElement('button');
+      potAddBtn.className = 'mc-btn small accent';
+      potAddBtn.textContent = 'Add';
+      potAddBtn.addEventListener('click', () => {
+        const def = POTION_EFFECTS.find(e => e.id === effSelect.value);
+        const amplifier = Math.max(1, Math.min(10, +ampInput.value || 1)) - 1;
+        const parts = String(durInput.value).split(':').map(n => parseInt(n,10));
+        let seconds = 45;
+        if(parts.length === 2 && !parts.some(isNaN)) seconds = parts[0]*60 + parts[1];
+        else if(parts.length === 1 && !isNaN(parts[0])) seconds = parts[0];
+        seconds = Math.max(1, Math.min(999999, seconds));
+        const existing = item.potionEffects.find(e => e.id === def.id);
+        if(existing){ existing.amplifier = amplifier; existing.duration = seconds; }
+        else item.potionEffects.push({ id: def.id, name: def.name, amplifier, duration: seconds });
+        renderAll();
+      });
+      potAddRow.appendChild(effSelect);
+      potAddRow.appendChild(ampInput);
+      potAddRow.appendChild(durInput);
+      potAddRow.appendChild(potAddBtn);
+      detailsPanel.appendChild(potAddRow);
+    }
 
     // Container info
     if(item.contents){
@@ -1094,6 +1244,19 @@
     state.hotbar[1] = bow;
 
     state.offhand = makeItem(findItem('shield'));
+
+    const splash = makeItem(findItem('splash_potion'));
+    if(splash.potionEffects){
+      splash.potionEffects = [{ id:'instant_health', name:'Instant Health', amplifier:1, duration:1 }];
+    }
+    state.hotbar[2] = splash;
+
+    const arrows = makeItem(findItem('tipped_arrow'));
+    arrows.count = 12;
+    if(arrows.potionEffects){
+      arrows.potionEffects = [{ id:'poison', name:'Poison', amplifier:0, duration:11 }];
+    }
+    state.hotbar[3] = arrows;
 
     selectedAccessor = null;
     renderAll();
