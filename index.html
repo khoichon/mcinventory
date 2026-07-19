@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crate — Minecraft Inventory Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --stone-light:#c6c6c6;
+    --stone:#8b8b8b;
+    --stone-dark:#373737;
+    --panel:#c6c6c6;
+    --panel-shadow-lo:#555555;
+    --panel-shadow-hi:#ffffff;
+    --slot-bg:#8b8b8b;
+    --bg-deep:#1b1d24;
+    --bg-deep-2:#26293380;
+    --accent:#5cc55c;
+    --accent-2:#3a8bd4;
+    --enchant:#a05cff;
+    --danger:#c94b4b;
+    --text-dark:#2b2b2b;
+    --text-mid:#4a4a4a;
+    --radius:2px;
+    --font-pixel:'Press Start 2P', monospace;
+    --font-body:'Inter', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:var(--font-body);
+    background:
+      radial-gradient(ellipse at top, #2b2f3d 0%, #14151b 70%),
+      linear-gradient(180deg,#1b1d24,#101116);
+    color:#e8e8ea;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 16px 60px;
+  }
+  .app-title{
+    font-family:var(--font-pixel);
+    font-size:15px;
+    letter-spacing:1px;
+    color:#fefefe;
+    text-shadow:2px 2px 0 #000;
+    margin:6px 0 4px;
+  }
+  .app-sub{
+    font-size:12.5px;
+    color:#9aa0ad;
+    margin-bottom:22px;
+    text-align:center;
+  }
+  .layout{
+    display:grid;
+    grid-template-columns:minmax(320px,560px) 340px;
+    gap:22px;
+    width:100%;
+    max-width:960px;
+    align-items:start;
+  }
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  /* ---------- Panel (Minecraft GUI look) ---------- */
+  .mc-panel{
+    background:linear-gradient(180deg,#d4d4d4,#a8a8a8);
+    border:4px solid transparent;
+    border-image: none;
+    box-shadow:
+      inset 3px 3px 0 var(--panel-shadow-hi),
+      inset -3px -3px 0 var(--panel-shadow-lo),
+      0 10px 30px rgba(0,0,0,.45);
+    padding:16px;
+    image-rendering:pixelated;
+  }
+  .panel-heading{
+    font-family:var(--font-pixel);
+    font-size:10px;
+    color:#2b2b2b;
+    margin:0 0 10px 2px;
+    letter-spacing:.5px;
+  }
+
+  .section-gap{ margin-top:16px; }
+
+  .slot-grid{
+    display:grid;
+    grid-template-columns:repeat(9, 1fr);
+    gap:4px;
+  }
+  .slot{
+    position:relative;
+    aspect-ratio:1/1;
+    background:var(--slot-bg);
+    box-shadow:
+      inset 2px 2px 0 #ffffff55,
+      inset -2px -2px 0 #00000055;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform .08s ease, box-shadow .12s ease;
+    border:none;
+    padding:0;
+  }
+  .slot:hover{
+    transform:translateY(-1px);
+    box-shadow:
+      inset 2px 2px 0 #ffffff88,
+      inset -2px -2px 0 #00000066,
+      0 0 0 2px #ffffffaa;
+  }
+  .slot.selected{
+    box-shadow:
+      inset 2px 2px 0 #ffffff88,
+      inset -2px -2px 0 #00000066,
+      0 0 0 2px var(--accent-2), 0 0 10px var(--accent-2);
+  }
+  .slot.enchanted{
+    box-shadow:
+      inset 2px 2px 0 #ffffff55,
+      inset -2px -2px 0 #00000055,
+      0 0 8px 2px var(--enchant);
+  }
+  .slot.selected.enchanted{
+    box-shadow:
+      inset 2px 2px 0 #ffffff88,
+      inset -2px -2px 0 #00000066,
+      0 0 0 2px var(--accent-2), 0 0 10px var(--enchant);
+  }
+  .slot-icon{
+    width:74%;
+    height:74%;
+    border-radius:3px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:var(--font-pixel);
+    font-size:9px;
+    color:#fff;
+    text-shadow:1px 1px 0 rgba(0,0,0,.5);
+    overflow:hidden;
+  }
+  .slot-count{
+    position:absolute;
+    bottom:1px;
+    right:3px;
+    font-size:11px;
+    font-weight:700;
+    color:#fff;
+    text-shadow:1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  }
+  .slot-badge{
+    position:absolute;
+    top:-3px;
+    left:-3px;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 2px #2b2b2b;
+    font-size:8px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#0a2a0a;
+    font-weight:800;
+  }
+  .slot-label{
+    position:absolute;
+    top:-16px;
+    left:2px;
+    font-size:8.5px;
+    color:#8f95a3;
+    font-family:var(--font-pixel);
+    white-space:nowrap;
+  }
+
+  .inv-main{ grid-template-columns:repeat(9,1fr); display:grid; gap:4px; }
+  .hotbar{ margin-top:8px; }
+
+  .special-row{
+    display:flex;
+    gap:18px;
+    margin-top:16px;
+    align-items:flex-start;
+  }
+  .armor-col{
+    display:grid;
+    grid-template-columns:repeat(1,1fr);
+    gap:4px;
+    width:52px;
+  }
+  .offhand-col{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    padding-top:0;
+  }
+  .special-row .slot{ width:52px; }
+
+  .toolbar{
+    display:flex;
+    gap:8px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+  .mc-btn{
+    font-family:var(--font-pixel);
+    font-size:8.5px;
+    padding:9px 12px;
+    background:linear-gradient(180deg,#d8d8d8,#a0a0a0);
+    box-shadow:inset 2px 2px 0 #fff, inset -2px -2px 0 #6b6b6b;
+    border:none;
+    cursor:pointer;
+    color:#2b2b2b;
+    letter-spacing:.4px;
+  }
+  .mc-btn:hover{ filter:brightness(1.06); }
+  .mc-btn:active{ box-shadow:inset -2px -2px 0 #fff, inset 2px 2px 0 #6b6b6b; }
+  .mc-btn.danger{ background:linear-gradient(180deg,#e08d8d,#b94b4b); color:#fff; }
+  .mc-btn.accent{ background:linear-gradient(180deg,#8fd88f,#4ba64b); color:#0a2a0a; }
+  .mc-btn.small{ padding:6px 9px; font-size:7.5px; }
+  .mc-btn:disabled{ opacity:.45; cursor:not-allowed; }
+
+  /* ---------- Details Panel ---------- */
+  .details-panel{
+    background:linear-gradient(180deg,#2a2d38,#1d1f27);
+    border-radius:6px;
+    padding:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.4), inset 0 0 0 1px #3a3f4d;
+    min-height:420px;
+    display:flex;
+    flex-direction:column;
+  }
+  .details-header{
+    display:flex;
+    gap:12px;
+    align-items:center;
+    padding-bottom:14px;
+    border-bottom:1px solid #3a3f4d;
+    margin-bottom:14px;
+  }
+  .details-icon{
+    width:48px;height:48px;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-pixel);font-size:11px;color:#fff;
+    flex-shrink:0;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.15);
+  }
+  .details-title{ font-weight:700; font-size:15px; color:#f3f4f7; line-height:1.25;}
+  .details-id{ font-size:11.5px; color:#8890a1; font-family: monospace; margin-top:2px;}
+  .details-empty{
+    color:#7b8194; font-size:13.5px; text-align:center; margin:auto; padding:40px 10px; line-height:1.6;
+  }
+  .field-label{
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.6px; color:#8890a1; margin:14px 0 6px;
+    font-weight:600;
+  }
+  .count-row{ display:flex; align-items:center; gap:8px; }
+  .count-row input[type=number]{
+    width:70px; padding:7px 8px; border-radius:4px; border:1px solid #444a5a;
+    background:#161821; color:#fff; font-size:14px;
+  }
+  .count-row input[type=range]{ flex:1; accent-color:var(--accent-2); }
+  .enchant-list{ display:flex; flex-direction:column; gap:6px; }
+  .enchant-chip{
+    display:flex; align-items:center; justify-content:space-between;
+    background:#2c1f47; border:1px solid #5a3b96; border-radius:5px;
+    padding:6px 10px; font-size:12.5px; color:#d9c8ff;
+  }
+  .enchant-chip button{
+    background:none; border:none; color:#c78bff; cursor:pointer; font-size:14px; line-height:1;
+  }
+  .enchant-add-row{ display:flex; gap:6px; margin-top:8px; }
+  .enchant-add-row select, .enchant-add-row select + select{
+    flex:1; padding:7px; border-radius:4px; background:#161821; color:#fff; border:1px solid #444a5a; font-size:12.5px;
+  }
+  .action-row{ display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+  .container-info{
+    background:#161821; border-radius:5px; padding:10px 12px; font-size:12.5px; color:#aab0c0; margin-top:10px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  .mini-note{ font-size:11px; color:#666e80; margin-top:auto; padding-top:14px;}
+
+  /* ---------- Modal (item picker) ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(6,7,10,.72);
+    display:flex; align-items:center; justify-content:center;
+    z-index:50; padding:20px;
+  }
+  .hidden{ display:none !important; }
+  .picker-modal{
+    width:100%; max-width:480px; max-height:82vh;
+    background:#1d1f27; border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 0 0 1px #3a3f4d;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .picker-header{ padding:16px 18px 10px; border-bottom:1px solid #333747; }
+  .picker-header h3{ margin:0 0 10px; font-size:15px; color:#f2f3f6; }
+  .picker-search{
+    width:100%; padding:10px 12px; border-radius:5px; border:1px solid #444a5a;
+    background:#101219; color:#fff; font-size:13.5px;
+  }
+  .picker-status{ font-size:11px; color:#6b7284; margin-top:8px; }
+  .picker-list{ overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:2px; }
+  .picker-item{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:5px; cursor:pointer;
+  }
+  .picker-item:hover{ background:#2a2d3a; }
+  .picker-icon{
+    width:30px;height:30px;border-radius:4px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-pixel);font-size:7px;color:#fff;
+  }
+  .picker-name{ font-size:13px; color:#eceef2; }
+  .picker-tech{ font-size:10.5px; color:#666e80; font-family:monospace; margin-left:auto; }
+  .picker-footer{ padding:10px 16px; border-top:1px solid #333747; display:flex; justify-content:flex-end; }
+
+  /* ---------- Container modal ---------- */
+  .container-modal{
+    width:100%; max-width:560px; max-height:88vh;
+    background:#1d1f27; border-radius:8px; box-shadow:0 20px 60px rgba(0,0,0,.6), inset 0 0 0 1px #3a3f4d;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  .breadcrumbs{
+    padding:14px 18px; border-bottom:1px solid #333747; display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+    font-size:12px;
+  }
+  .crumb{ color:#8890a1; cursor:pointer; }
+  .crumb:hover{ color:#fff; text-decoration:underline; }
+  .crumb.current{ color:#fff; font-weight:600; cursor:default; text-decoration:none; }
+  .crumb-sep{ color:#4c5165; }
+  .container-body{ padding:20px; overflow-y:auto; }
+  .container-grid{
+    display:grid; grid-template-columns:repeat(9,1fr); gap:4px; background:#8b8b8b; padding:10px; border-radius:4px;
+    box-shadow:inset 2px 2px 0 #ffffff55, inset -2px -2px 0 #00000055;
+  }
+  .container-close{ padding:10px 16px; border-top:1px solid #333747; display:flex; justify-content:flex-end; }
+
+  /* ---------- Import / Export ---------- */
+  .io-panel{ margin-top:22px; width:100%; max-width:960px; }
+  .io-textarea{
+    width:100%; min-height:110px; resize:vertical; padding:12px; border-radius:6px;
+    background:#12131a; color:#c9cddb; border:1px solid #333747; font-family:monospace; font-size:12px;
+  }
+  .io-actions{ display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; align-items:center;}
+  .io-msg{ font-size:12px; color:#8fd88f; }
+  .io-msg.error{ color:#e08d8d; }
+
+  ::-webkit-scrollbar{ width:9px; }
+  ::-webkit-scrollbar-thumb{ background:#3a3f4d; border-radius:5px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+</style>
+</head>
+<body>
+
+  <div class="app-title">CRATE</div>
+  <div class="app-sub">A Minecraft-style inventory sandbox — assign items, enchant them, nest containers infinitely deep.</div>
+
+  <div class="layout">
+    <!-- MAIN INVENTORY PANEL -->
+    <div class="mc-panel" id="mainPanel">
+      <div class="panel-heading">ARMOR &amp; OFF HAND</div>
+      <div class="special-row">
+        <div class="armor-col" id="armorCol"></div>
+        <div class="offhand-col" id="offhandCol"></div>
+        <div style="flex:1"></div>
+      </div>
+
+      <div class="panel-heading section-gap">INVENTORY</div>
+      <div class="slot-grid" id="invGrid" style="grid-template-columns:repeat(9,1fr);"></div>
+
+      <div class="panel-heading section-gap">HOTBAR</div>
+      <div class="slot-grid" id="hotbarGrid"></div>
+
+      <div class="toolbar">
+        <button class="mc-btn danger" id="resetAllBtn">Reset All</button>
+        <button class="mc-btn" id="fillDemoBtn">Load Demo Kit</button>
+      </div>
+    </div>
+
+    <!-- DETAILS PANEL -->
+    <div class="details-panel" id="detailsPanel">
+      <div class="details-empty" id="detailsEmpty">Select any slot to inspect its contents.<br><br>Enchanted items glow purple. Filled containers show a green dot badge.</div>
+    </div>
+  </div>
+
+  <!-- IMPORT / EXPORT -->
+  <div class="mc-panel io-panel">
+    <div class="panel-heading">IMPORT / EXPORT</div>
+    <textarea class="io-textarea" id="ioText" placeholder="Exported data will appear here. Paste data here and click Import to load it."></textarea>
+    <div class="io-actions">
+      <button class="mc-btn accent" id="exportBtn">Export Data</button>
+      <button class="mc-btn" id="importBtn">Import Data</button>
+      <button class="mc-btn small" id="copyBtn">Copy</button>
+      <span class="io-msg" id="ioMsg"></span>
+    </div>
+  </div>
+
+  <!-- ITEM PICKER MODAL -->
+  <div class="overlay hidden" id="pickerOverlay">
+    <div class="picker-modal">
+      <div class="picker-header">
+        <h3>Choose an item</h3>
+        <input class="picker-search" id="pickerSearch" placeholder="Search items… e.g. shulker, diamond, chest" autocomplete="off">
+        <div class="picker-status" id="pickerStatus">Loading item database…</div>
+      </div>
+      <div class="picker-list" id="pickerList"></div>
+      <div class="picker-footer">
+        <button class="mc-btn danger small" id="pickerClearBtn">Clear this slot</button>
+        <div style="flex:1"></div>
+        <button class="mc-btn small" id="pickerCancelBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTAINER MODAL -->
+  <div class="overlay hidden" id="containerOverlay">
+    <div class="container-modal">
+      <div class="breadcrumbs" id="breadcrumbs"></div>
+      <div class="container-body">
+        <div class="container-grid" id="containerGrid"></div>
+      </div>
+      <div class="container-close">
+        <button class="mc-btn small" id="containerCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================= DATA ============================= */
+
+  const ENCHANTMENTS = [
+    {id:'sharpness', name:'Sharpness', max:5},
+    {id:'smite', name:'Smite', max:5},
+    {id:'bane_of_arthropods', name:'Bane of Arthropods', max:5},
+    {id:'knockback', name:'Knockback', max:2},
+    {id:'fire_aspect', name:'Fire Aspect', max:2},
+    {id:'looting', name:'Looting', max:3},
+    {id:'sweeping_edge', name:'Sweeping Edge', max:3},
+    {id:'efficiency', name:'Efficiency', max:5},
+    {id:'silk_touch', name:'Silk Touch', max:1},
+    {id:'unbreaking', name:'Unbreaking', max:3},
+    {id:'fortune', name:'Fortune', max:3},
+    {id:'power', name:'Power', max:5},
+    {id:'punch', name:'Punch', max:2},
+    {id:'flame', name:'Flame', max:1},
+    {id:'infinity', name:'Infinity', max:1},
+    {id:'protection', name:'Protection', max:4},
+    {id:'fire_protection', name:'Fire Protection', max:4},
+    {id:'feather_falling', name:'Feather Falling', max:4},
+    {id:'blast_protection', name:'Blast Protection', max:4},
+    {id:'projectile_protection', name:'Projectile Protection', max:4},
+    {id:'respiration', name:'Respiration', max:3},
+    {id:'aqua_affinity', name:'Aqua Affinity', max:1},
+    {id:'thorns', name:'Thorns', max:3},
+    {id:'depth_strider', name:'Depth Strider', max:3},
+    {id:'frost_walker', name:'Frost Walker', max:2},
+    {id:'mending', name:'Mending', max:1},
+    {id:'curse_of_binding', name:'Curse of Binding', max:1},
+    {id:'curse_of_vanishing', name:'Curse of Vanishing', max:1},
+    {id:'loyalty', name:'Loyalty', max:3},
+    {id:'impaling', name:'Impaling', max:5},
+    {id:'riptide', name:'Riptide', max:3},
+    {id:'channeling', name:'Channeling', max:1},
+    {id:'multishot', name:'Multishot', max:1},
+    {id:'piercing', name:'Piercing', max:4},
+    {id:'quick_charge', name:'Quick Charge', max:3},
+    {id:'soul_speed', name:'Soul Speed', max:3},
+    {id:'swift_sneak', name:'Swift Sneak', max:3},
+    {id:'luck_of_the_sea', name:'Luck of the Sea', max:3},
+    {id:'lure', name:'Lure', max:3},
+  ];
+  const ROMAN = ['','I','II','III','IV','V','VI','VII','VIII','IX','X'];
+
+  // Offline fallback item list, used only if both CDN sources fail.
+  const FALLBACK_ITEMS = [
+    ['diamond_sword','Diamond Sword',1],['netherite_sword','Netherite Sword',1],
+    ['diamond_pickaxe','Diamond Pickaxe',1],['diamond_axe','Diamond Axe',1],
+    ['diamond_shovel','Diamond Shovel',1],['diamond_hoe','Diamond Hoe',1],
+    ['bow','Bow',1],['crossbow','Crossbow',1],['trident','Trident',1],
+    ['diamond_helmet','Diamond Helmet',1],['diamond_chestplate','Diamond Chestplate',1],
+    ['diamond_leggings','Diamond Leggings',1],['diamond_boots','Diamond Boots',1],
+    ['netherite_helmet','Netherite Helmet',1],['netherite_chestplate','Netherite Chestplate',1],
+    ['leather_helmet','Leather Helmet',1],['golden_apple','Golden Apple',64],
+    ['enchanted_golden_apple','Enchanted Golden Apple',64],
+    ['diamond','Diamond',64],['emerald','Emerald',64],['gold_ingot','Gold Ingot',64],
+    ['iron_ingot','Iron Ingot',64],['netherite_ingot','Netherite Ingot',64],
+    ['ender_pearl','Ender Pearl',16],['ender_eye','Eye of Ender',64],
+    ['totem_of_undying','Totem of Undying',1],['elytra','Elytra',1],
+    ['shield','Shield',1],['arrow','Arrow',64],['tnt','TNT',64],
+    ['cooked_beef','Cooked Beef',64],['bread','Bread',64],['apple','Apple',64],
+    ['cobblestone','Cobblestone',64],['oak_log','Oak Log',64],['glass','Glass',64],
+    ['torch','Torch',64],['book','Book',64],['enchanted_book','Enchanted Book',1],
+    ['chest','Chest',64],['trapped_chest','Trapped Chest',64],['ender_chest','Ender Chest',64],
+    ['barrel','Barrel',64],['hopper','Hopper',64],['dispenser','Dispenser',64],
+    ['dropper','Dropper',64],['bundle','Bundle',1],
+    ['shulker_box','Shulker Box',1],['white_shulker_box','White Shulker Box',1],
+    ['red_shulker_box','Red Shulker Box',1],['blue_shulker_box','Blue Shulker Box',1],
+    ['purple_shulker_box','Purple Shulker Box',1],['black_shulker_box','Black Shulker Box',1],
+    ['lime_shulker_box','Lime Shulker Box',1],['yellow_shulker_box','Yellow Shulker Box',1],
+    ['crafting_table','Crafting Table',64],['furnace','Furnace',64],['anvil','Anvil',64],
+    ['name_tag','Name Tag',64],['saddle','Saddle',1],['compass','Compass',64],
+    ['clock','Clock',64],['fishing_rod','Fishing Rod',1],['flint_and_steel','Flint and Steel',1],
+  ];
+
+  const CONTAINER_LABELS = {
+    'chest':'Chest','trapped_chest':'Trapped Chest','ender_chest':'Ender Chest','barrel':'Barrel',
+    'hopper':'Hopper','dispenser':'Dispenser','dropper':'Dropper','bundle':'Bundle'
+  };
+
+  function getContainerCapacity(name){
+    if(!name) return 0;
+    if(/shulker_box/.test(name)) return 27;
+    if(name.includes('chest')) return 27;
+    if(name === 'barrel') return 27;
+    if(name === 'hopper') return 5;
+    if(name === 'dispenser' || name === 'dropper') return 9;
+    if(name === 'bundle') return 12;
+    return 0;
+  }
+  function isContainerName(name){ return getContainerCapacity(name) > 0; }
+
+  /* ============================= ICON COLOR ============================= */
+  function hashColor(str){
+    let h = 0;
+    for(let i=0;i<str.length;i++){ h = (h*31 + str.charCodeAt(i)) >>> 0; }
+    const hue = h % 360;
+    return `hsl(${hue} 55% 42%)`;
+  }
+  function iconInitials(displayName){
+    const words = displayName.replace(/[^a-zA-Z0-9 ]/g,'').split(' ').filter(Boolean);
+    if(words.length === 0) return '?';
+    if(words.length === 1) return words[0].slice(0,2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  /* ============================= ITEM DATABASE LOADING ============================= */
+  let ITEMS = [];
+  const pickerStatus = document.getElementById('pickerStatus');
+
+  function normalizeApiItems(raw){
+    return raw
+      .filter(it => it && it.name && it.displayName)
+      .map(it => ({ name: it.name, displayName: it.displayName, stackSize: it.stackSize || 64 }));
+  }
+
+  async function loadItemDatabase(){
+    const primary = 'https://unpkg.com/minecraft-data@3.57.0/minecraft-data/data/pc/1.19/items.json';
+    const fallbackCdn = 'https://raw.githubusercontent.com/PrismarineJS/minecraft-data/master/data/pc/1.19/items.json';
+    try{
+      const res = await fetch(primary);
+      if(!res.ok) throw new Error('bad status');
+      const json = await res.json();
+      ITEMS = normalizeApiItems(json);
+      pickerStatus.textContent = `Loaded ${ITEMS.length} items from unpkg (PrismarineJS minecraft-data).`;
+      return;
+    }catch(e){ /* try fallback */ }
+    try{
+      const res = await fetch(fallbackCdn);
+      if(!res.ok) throw new Error('bad status');
+      const json = await res.json();
+      ITEMS = normalizeApiItems(json);
+      pickerStatus.textContent = `Loaded ${ITEMS.length} items from GitHub (PrismarineJS minecraft-data).`;
+      return;
+    }catch(e){ /* fall back to offline list */ }
+    ITEMS = FALLBACK_ITEMS.map(([name, displayName, stackSize]) => ({name, displayName, stackSize}));
+    pickerStatus.textContent = `Offline mode — using a built-in list of ${ITEMS.length} common items.`;
+  }
+
+  /* ============================= STATE ============================= */
+
+  function emptyState(){
+    return {
+      hotbar: Array(9).fill(null),
+      inventory: Array(27).fill(null),
+      armor: { helmet: null, chestplate: null, leggings: null, boots: null },
+      offhand: null
+    };
+  }
+  let state = emptyState();
+
+  function makeItem(dbItem){
+    const capacity = getContainerCapacity(dbItem.name);
+    return {
+      name: dbItem.name,
+      displayName: dbItem.displayName,
+      count: 1,
+      maxStack: dbItem.stackSize || 64,
+      enchantments: [],
+      contents: capacity > 0 ? Array(capacity).fill(null) : null
+    };
+  }
+
+  /* ============================= ACCESSORS ============================= */
+  // Uniform accessor over arrays (index) and objects (key)
+  function makeAccessor(container, key){
+    return {
+      container, key,
+      get(){ return container[key]; },
+      set(item){ container[key] = item; },
+      remove(){ container[key] = null; }
+    };
+  }
+
+  let selectedAccessor = null;   // currently inspected slot
+  let navStack = [];             // [{item, label}] path for the open container modal
+
+  /* ============================= RENDER: MAIN GRID ============================= */
+
+  const invGrid = document.getElementById('invGrid');
+  const hotbarGrid = document.getElementById('hotbarGrid');
+  const armorCol = document.getElementById('armorCol');
+  const offhandCol = document.getElementById('offhandCol');
+
+  const ARMOR_SLOTS = [
+    {key:'helmet', label:'Helmet'},
+    {key:'chestplate', label:'Chestplate'},
+    {key:'leggings', label:'Leggings'},
+    {key:'boots', label:'Boots'}
+  ];
+
+  function buildSlotEl(accessor, labelText){
+    const el = document.createElement('button');
+    el.className = 'slot';
+    el.type = 'button';
+    if(labelText){
+      const lbl = document.createElement('div');
+      lbl.className = 'slot-label';
+      lbl.textContent = labelText;
+      el.appendChild(lbl);
+    }
+    renderSlotContent(el, accessor);
+    el.addEventListener('click', () => handleSlotClick(accessor));
+    return el;
+  }
+
+  function renderSlotContent(el, accessor){
+    // clear icon/count/badge but keep label if present
+    Array.from(el.querySelectorAll('.slot-icon,.slot-count,.slot-badge')).forEach(n => n.remove());
+    el.classList.remove('enchanted','selected');
+    const item = accessor.get();
+
+    if(selectedAccessor && selectedAccessor.container === accessor.container && selectedAccessor.key === accessor.key){
+      el.classList.add('selected');
+    }
+
+    if(!item) return;
+
+    const icon = document.createElement('div');
+    icon.className = 'slot-icon';
+    icon.style.background = hashColor(item.name);
+    icon.textContent = iconInitials(item.displayName);
+    el.appendChild(icon);
+
+    if(item.count > 1){
+      const c = document.createElement('div');
+      c.className = 'slot-count';
+      c.textContent = item.count;
+      el.appendChild(c);
+    }
+
+    if(item.enchantments && item.enchantments.length > 0){
+      el.classList.add('enchanted');
+    }
+
+    if(item.contents && item.contents.some(Boolean)){
+      const badge = document.createElement('div');
+      badge.className = 'slot-badge';
+      badge.textContent = item.contents.filter(Boolean).length;
+      el.appendChild(badge);
+    }
+  }
+
+  function renderMain(){
+    invGrid.innerHTML = '';
+    state.inventory.forEach((_, i) => {
+      invGrid.appendChild(buildSlotEl(makeAccessor(state.inventory, i)));
+    });
+    hotbarGrid.innerHTML = '';
+    state.hotbar.forEach((_, i) => {
+      hotbarGrid.appendChild(buildSlotEl(makeAccessor(state.hotbar, i)));
+    });
+    armorCol.innerHTML = '';
+    ARMOR_SLOTS.forEach(({key,label}) => {
+      armorCol.appendChild(buildSlotEl(makeAccessor(state.armor, key), label));
+    });
+    offhandCol.innerHTML = '';
+    offhandCol.appendChild(buildSlotEl(makeAccessor(state, 'offhand'), 'Off Hand'));
+  }
+
+  /* ============================= SLOT CLICK ============================= */
+
+  function handleSlotClick(accessor){
+    // Selecting main-grid slots is only allowed while no container modal is open.
+    selectedAccessor = accessor;
+    renderMain();
+    renderContainerGridIfOpen();
+    renderDetails();
+    const item = accessor.get();
+    if(!item){
+      openPicker(accessor);
+    }
+  }
+
+  /* ============================= DETAILS PANEL ============================= */
+
+  const detailsPanel = document.getElementById('detailsPanel');
+
+  function renderDetails(){
+    detailsPanel.innerHTML = '';
+    if(!selectedAccessor){
+      const empty = document.createElement('div');
+      empty.className = 'details-empty';
+      empty.innerHTML = 'Select any slot to inspect its contents.<br><br>Enchanted items glow purple. Filled containers show a green dot badge.';
+      detailsPanel.appendChild(empty);
+      return;
+    }
+    const item = selectedAccessor.get();
+    if(!item){
+      const empty = document.createElement('div');
+      empty.className = 'details-empty';
+      empty.innerHTML = 'This slot is empty.';
+      const btn = document.createElement('button');
+      btn.className = 'mc-btn accent';
+      btn.style.marginTop = '14px';
+      btn.textContent = 'Choose Item';
+      btn.addEventListener('click', () => openPicker(selectedAccessor));
+      empty.appendChild(document.createElement('br'));
+      empty.appendChild(btn);
+      detailsPanel.appendChild(empty);
+      return;
+    }
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'details-header';
+    const icon = document.createElement('div');
+    icon.className = 'details-icon';
+    icon.style.background = hashColor(item.name);
+    icon.textContent = iconInitials(item.displayName);
+    const titleWrap = document.createElement('div');
+    titleWrap.innerHTML = `<div class="details-title">${escapeHtml(item.displayName)}</div><div class="details-id">minecraft:${escapeHtml(item.name)}</div>`;
+    header.appendChild(icon);
+    header.appendChild(titleWrap);
+    detailsPanel.appendChild(header);
+
+    // Stack count
+    const countLabel = document.createElement('div');
+    countLabel.className = 'field-label';
+    countLabel.textContent = 'Stack Count';
+    detailsPanel.appendChild(countLabel);
+
+    const countRow = document.createElement('div');
+    countRow.className = 'count-row';
+    const range = document.createElement('input');
+    range.type = 'range'; range.min = 1; range.max = 64; range.value = item.count;
+    const num = document.createElement('input');
+    num.type = 'number'; num.min = 1; num.max = 64; num.value = item.count;
+    range.addEventListener('input', () => { num.value = range.value; setCount(item, +range.value); });
+    num.addEventListener('input', () => {
+      let v = Math.max(1, Math.min(64, +num.value || 1));
+      range.value = v; setCount(item, v);
+    });
+    countRow.appendChild(range);
+    countRow.appendChild(num);
+    detailsPanel.appendChild(countRow);
+
+    // Enchantments
+    const enchLabel = document.createElement('div');
+    enchLabel.className = 'field-label';
+    enchLabel.textContent = 'Enchantments';
+    detailsPanel.appendChild(enchLabel);
+
+    const enchList = document.createElement('div');
+    enchList.className = 'enchant-list';
+    if(item.enchantments.length === 0){
+      const none = document.createElement('div');
+      none.style.cssText = 'font-size:12px;color:#666e80;';
+      none.textContent = 'No enchantments applied.';
+      enchList.appendChild(none);
+    } else {
+      item.enchantments.forEach((ench, idx) => {
+        const chip = document.createElement('div');
+        chip.className = 'enchant-chip';
+        chip.innerHTML = `<span>${escapeHtml(ench.name)} ${ROMAN[ench.level] || ench.level}</span>`;
+        const rm = document.createElement('button');
+        rm.textContent = '✕';
+        rm.addEventListener('click', () => {
+          item.enchantments.splice(idx,1);
+          renderAll();
+        });
+        chip.appendChild(rm);
+        enchList.appendChild(chip);
+      });
+    }
+    detailsPanel.appendChild(enchList);
+
+    const addRow = document.createElement('div');
+    addRow.className = 'enchant-add-row';
+    const enchSelect = document.createElement('select');
+    ENCHANTMENTS.forEach(e => {
+      const opt = document.createElement('option');
+      opt.value = e.id; opt.textContent = e.name;
+      enchSelect.appendChild(opt);
+    });
+    const lvlSelect = document.createElement('select');
+    function refreshLevels(){
+      lvlSelect.innerHTML = '';
+      const def = ENCHANTMENTS.find(e => e.id === enchSelect.value);
+      for(let l=1; l<=def.max; l++){
+        const opt = document.createElement('option');
+        opt.value = l; opt.textContent = 'Level ' + (ROMAN[l] || l);
+        lvlSelect.appendChild(opt);
+      }
+    }
+    enchSelect.addEventListener('change', refreshLevels);
+    refreshLevels();
+    const addBtn = document.createElement('button');
+    addBtn.className = 'mc-btn small accent';
+    addBtn.textContent = 'Add';
+    addBtn.addEventListener('click', () => {
+      const def = ENCHANTMENTS.find(e => e.id === enchSelect.value);
+      const level = +lvlSelect.value;
+      const existing = item.enchantments.find(e => e.id === def.id);
+      if(existing) existing.level = level;
+      else item.enchantments.push({ id: def.id, name: def.name, level });
+      renderAll();
+    });
+    addRow.appendChild(enchSelect);
+    addRow.appendChild(lvlSelect);
+    addRow.appendChild(addBtn);
+    detailsPanel.appendChild(addRow);
+
+    // Container info
+    if(item.contents){
+      const filled = item.contents.filter(Boolean).length;
+      const info = document.createElement('div');
+      info.className = 'container-info';
+      info.innerHTML = `<span>${CONTAINER_LABELS[baseContainerKey(item.name)] || 'Container'} · ${filled}/${item.contents.length} slots used</span>`;
+      const manageBtn = document.createElement('button');
+      manageBtn.className = 'mc-btn small accent';
+      manageBtn.textContent = 'Manage Contents';
+      manageBtn.addEventListener('click', () => {
+        navStack.push({ item, label: item.displayName });
+        openContainerModal();
+      });
+      info.appendChild(manageBtn);
+      detailsPanel.appendChild(info);
+    }
+
+    // Actions
+    const actionRow = document.createElement('div');
+    actionRow.className = 'action-row';
+    const changeBtn = document.createElement('button');
+    changeBtn.className = 'mc-btn';
+    changeBtn.textContent = 'Change Item';
+    changeBtn.addEventListener('click', () => openPicker(selectedAccessor));
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'mc-btn danger';
+    clearBtn.textContent = 'Clear Slot';
+    clearBtn.addEventListener('click', () => {
+      clearSlotViaAccessor(selectedAccessor);
+    });
+    actionRow.appendChild(changeBtn);
+    actionRow.appendChild(clearBtn);
+    detailsPanel.appendChild(actionRow);
+
+    const note = document.createElement('div');
+    note.className = 'mini-note';
+    note.textContent = 'Changes here are reflected instantly in the grid and included in Export Data.';
+    detailsPanel.appendChild(note);
+  }
+
+  function baseContainerKey(name){
+    if(/shulker_box/.test(name)) return name.includes('shulker_box') ? (Object.keys(CONTAINER_LABELS).includes(name) ? name : 'shulker_box') : name;
+    return name;
+  }
+
+  function setCount(item, v){
+    item.count = Math.max(1, Math.min(64, v));
+    renderMain();
+    renderContainerGridIfOpen();
+  }
+
+  function clearSlotViaAccessor(accessor){
+    const removed = accessor.get();
+    if(removed && navStack.some(level => level.item === removed)){
+      navStack = [];
+      closeContainerModal();
+    }
+    accessor.remove();
+    selectedAccessor = accessor;
+    renderAll();
+  }
+
+  function escapeHtml(str){
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  /* ============================= ITEM PICKER MODAL ============================= */
+
+  const pickerOverlay = document.getElementById('pickerOverlay');
+  const pickerSearch = document.getElementById('pickerSearch');
+  const pickerList = document.getElementById('pickerList');
+  const pickerCancelBtn = document.getElementById('pickerCancelBtn');
+  const pickerClearBtn = document.getElementById('pickerClearBtn');
+  let pickerAccessor = null;
+
+  function openPicker(accessor){
+    pickerAccessor = accessor;
+    pickerOverlay.classList.remove('hidden');
+    pickerSearch.value = '';
+    pickerClearBtn.disabled = !accessor.get();
+    renderPickerList('');
+    setTimeout(() => pickerSearch.focus(), 30);
+  }
+  function closePicker(){
+    pickerOverlay.classList.add('hidden');
+    pickerAccessor = null;
+  }
+  function renderPickerList(query){
+    const q = query.trim().toLowerCase();
+    let results = ITEMS;
+    if(q){
+      results = ITEMS.filter(it => it.displayName.toLowerCase().includes(q) || it.name.toLowerCase().includes(q));
+    }
+    results = results.slice(0, 250);
+    pickerList.innerHTML = '';
+    if(results.length === 0){
+      const none = document.createElement('div');
+      none.style.cssText = 'padding:20px;text-align:center;color:#666e80;font-size:13px;';
+      none.textContent = 'No items match your search.';
+      pickerList.appendChild(none);
+      return;
+    }
+    results.forEach(it => {
+      const row = document.createElement('div');
+      row.className = 'picker-item';
+      const icon = document.createElement('div');
+      icon.className = 'picker-icon';
+      icon.style.background = hashColor(it.name);
+      icon.textContent = iconInitials(it.displayName);
+      const name = document.createElement('div');
+      name.className = 'picker-name';
+      name.textContent = it.displayName;
+      const tech = document.createElement('div');
+      tech.className = 'picker-tech';
+      tech.textContent = it.name;
+      row.appendChild(icon); row.appendChild(name); row.appendChild(tech);
+      row.addEventListener('click', () => {
+        if(pickerAccessor){
+          pickerAccessor.set(makeItem(it));
+          selectedAccessor = pickerAccessor;
+        }
+        closePicker();
+        renderAll();
+      });
+      pickerList.appendChild(row);
+    });
+  }
+  pickerSearch.addEventListener('input', () => renderPickerList(pickerSearch.value));
+  pickerCancelBtn.addEventListener('click', closePicker);
+  pickerClearBtn.addEventListener('click', () => {
+    if(pickerAccessor) clearSlotViaAccessor(pickerAccessor);
+    closePicker();
+  });
+  pickerOverlay.addEventListener('click', (e) => { if(e.target === pickerOverlay) closePicker(); });
+
+  /* ============================= CONTAINER MODAL (RECURSIVE) ============================= */
+
+  const containerOverlay = document.getElementById('containerOverlay');
+  const breadcrumbsEl = document.getElementById('breadcrumbs');
+  const containerGridEl = document.getElementById('containerGrid');
+  const containerCloseBtn = document.getElementById('containerCloseBtn');
+
+  function openContainerModal(){
+    containerOverlay.classList.remove('hidden');
+    renderBreadcrumbs();
+    renderContainerGrid();
+  }
+  function closeContainerModal(){
+    containerOverlay.classList.add('hidden');
+  }
+  function renderBreadcrumbs(){
+    breadcrumbsEl.innerHTML = '';
+    const root = document.createElement('span');
+    root.className = 'crumb' + (navStack.length === 0 ? ' current' : '');
+    root.textContent = 'Inventory';
+    root.addEventListener('click', () => {
+      navStack = [];
+      closeContainerModal();
+      renderAll();
+    });
+    breadcrumbsEl.appendChild(root);
+    navStack.forEach((level, i) => {
+      const sep = document.createElement('span');
+      sep.className = 'crumb-sep';
+      sep.textContent = '›';
+      breadcrumbsEl.appendChild(sep);
+      const crumb = document.createElement('span');
+      crumb.className = 'crumb' + (i === navStack.length - 1 ? ' current' : '');
+      crumb.textContent = level.label;
+      crumb.addEventListener('click', () => {
+        navStack = navStack.slice(0, i + 1);
+        renderBreadcrumbs();
+        renderContainerGrid();
+      });
+      breadcrumbsEl.appendChild(crumb);
+    });
+  }
+  function renderContainerGrid(){
+    containerGridEl.innerHTML = '';
+    if(navStack.length === 0) return;
+    const current = navStack[navStack.length - 1].item;
+    current.contents.forEach((_, i) => {
+      const acc = makeAccessor(current.contents, i);
+      containerGridEl.appendChild(buildSlotEl(acc));
+    });
+  }
+  function renderContainerGridIfOpen(){
+    if(!containerOverlay.classList.contains('hidden')){
+      renderContainerGrid();
+    }
+  }
+  containerCloseBtn.addEventListener('click', () => {
+    navStack = [];
+    closeContainerModal();
+    renderAll();
+  });
+  containerOverlay.addEventListener('click', (e) => {
+    if(e.target === containerOverlay){
+      navStack = [];
+      closeContainerModal();
+      renderAll();
+    }
+  });
+
+  /* ============================= RESET / DEMO ============================= */
+
+  document.getElementById('resetAllBtn').addEventListener('click', () => {
+    if(!confirm('Reset the entire inventory, armor and off-hand? This cannot be undone.')) return;
+    state = emptyState();
+    selectedAccessor = null;
+    navStack = [];
+    closeContainerModal();
+    renderAll();
+  });
+
+  document.getElementById('fillDemoBtn').addEventListener('click', () => {
+    const findItem = (name) => ITEMS.find(i => i.name === name) || {name, displayName: name, stackSize: 64};
+    const sword = makeItem(findItem('diamond_sword'));
+    sword.enchantments = [{id:'sharpness', name:'Sharpness', level:5}, {id:'unbreaking', name:'Unbreaking', level:3}, {id:'mending', name:'Mending', level:1}];
+    state.hotbar[0] = sword;
+
+    const helm = makeItem(findItem('diamond_helmet'));
+    helm.enchantments = [{id:'protection', name:'Protection', level:4}];
+    state.armor.helmet = helm;
+
+    const shulker = makeItem(findItem('purple_shulker_box') || findItem('shulker_box'));
+    const gold = makeItem(findItem('gold_ingot')); gold.count = 34;
+    const book = makeItem(findItem('enchanted_book')); book.enchantments = [{id:'fortune', name:'Fortune', level:3}];
+    if(shulker.contents){
+      shulker.contents[0] = gold;
+      shulker.contents[1] = book;
+      const nestedShulker = makeItem(findItem('shulker_box'));
+      const pearl = makeItem(findItem('ender_pearl')); pearl.count = 16;
+      if(nestedShulker.contents) nestedShulker.contents[0] = pearl;
+      shulker.contents[2] = nestedShulker;
+    }
+    state.inventory[0] = shulker;
+
+    const chest = makeItem(findItem('chest'));
+    if(chest.contents){
+      const apple = makeItem(findItem('golden_apple')); apple.count = 12;
+      chest.contents[0] = apple;
+    }
+    state.inventory[1] = chest;
+
+    const bow = makeItem(findItem('bow'));
+    bow.enchantments = [{id:'power', name:'Power', level:5}, {id:'infinity', name:'Infinity', level:1}];
+    state.hotbar[1] = bow;
+
+    state.offhand = makeItem(findItem('shield'));
+
+    selectedAccessor = null;
+    renderAll();
+  });
+
+  /* ============================= IMPORT / EXPORT ============================= */
+
+  const ioText = document.getElementById('ioText');
+  const ioMsg = document.getElementById('ioMsg');
+
+  function utf8ToBase64(str){
+    return btoa(unescape(encodeURIComponent(str)));
+  }
+  function base64ToUtf8(str){
+    return decodeURIComponent(escape(atob(str)));
+  }
+
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    try{
+      const json = JSON.stringify(state);
+      const encoded = utf8ToBase64(json);
+      ioText.value = encoded;
+      ioMsg.textContent = `Exported (${encoded.length} chars).`;
+      ioMsg.classList.remove('error');
+    }catch(e){
+      ioMsg.textContent = 'Export failed: ' + e.message;
+      ioMsg.classList.add('error');
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    try{
+      await navigator.clipboard.writeText(ioText.value);
+      ioMsg.textContent = 'Copied to clipboard.';
+      ioMsg.classList.remove('error');
+    }catch(e){
+      ioText.select();
+      ioMsg.textContent = 'Clipboard blocked — text selected, use Ctrl/Cmd+C.';
+    }
+  });
+
+  function validateState(obj){
+    if(!obj || typeof obj !== 'object') return false;
+    if(!Array.isArray(obj.hotbar) || !Array.isArray(obj.inventory)) return false;
+    if(!obj.armor || typeof obj.armor !== 'object') return false;
+    return true;
+  }
+
+  document.getElementById('importBtn').addEventListener('click', () => {
+    const raw = ioText.value.trim();
+    if(!raw){
+      ioMsg.textContent = 'Paste an exported string first.';
+      ioMsg.classList.add('error');
+      return;
+    }
+    try{
+      let json;
+      try{ json = base64ToUtf8(raw); }
+      catch(e){ json = raw; } // allow raw JSON paste too
+      const parsed = JSON.parse(json);
+      if(!validateState(parsed)) throw new Error('Data is missing required fields.');
+      state = parsed;
+      selectedAccessor = null;
+      navStack = [];
+      closeContainerModal();
+      renderAll();
+      ioMsg.textContent = 'Import successful.';
+      ioMsg.classList.remove('error');
+    }catch(e){
+      ioMsg.textContent = 'Import failed: ' + e.message;
+      ioMsg.classList.add('error');
+    }
+  });
+
+  /* ============================= RENDER ALL ============================= */
+
+  function renderAll(){
+    renderMain();
+    renderContainerGridIfOpen();
+    if(!containerOverlay.classList.contains('hidden')) renderBreadcrumbs();
+    renderDetails();
+  }
+
+  /* ============================= INIT ============================= */
+
+  loadItemDatabase().then(renderAll);
+  renderAll();
+
+})();
+</script>
+</body>
+</html>
